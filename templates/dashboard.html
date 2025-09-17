@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Renewable Energy Monitor{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshAllData()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card solar-color">
+            <div class="card-body">
+                <div class="stat-value" id="solar-stat">{{ stats.current_solar }}W</div>
+                <div class="stat-label">Solar Generation</div>
+                <small class="text-muted">Efficiency: <span id="efficiency-stat">{{ stats.efficiency }}%</span></small>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card wind-color">
+            <div class="card-body">
+                <div class="stat-value" id="wind-stat">{{ stats.current_wind }}W</div>
+                <div class="stat-label">Wind Generation</div>
+                <small class="text-muted">Sun Intensity: <span id="sun-intensity-stat">{{ stats.sun_intensity }}W/m²</span></small>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card consumption-color">
+            <div class="card-body">
+                <div class="stat-value" id="consumption-stat">{{ stats.current_consumption }}W</div>
+                <div class="stat-label">Current Consumption</div>
+                <small class="text-muted">Real-time usage</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card stat-card battery-color">
+            <div class="card-body">
+                <div class="stat-value" id="battery-stat">{{ stats.battery_percentage }}%</div>
+                <div class="stat-label">Battery Level</div>
+                <small class="text-muted">
+                    <span id="battery-level-stat">{{ stats.battery_level }}Wh</span>
+                    {% if stats.alerts_count > 0 %}
+                        <span class="badge bg-danger ms-2">{{ stats.alerts_count }} alerts</span>
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Graphs Row -->
+<div class="row">
+    <!-- Power Generation Graph -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-bolt me-2"></i>Real-time Power Generation vs Consumption
+            </div>
+            <div class="card-body">
+                <div id="power-generation-graph" class="graph-container"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Battery Storage Graph -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-battery-half me-2"></i>Battery Storage Level
+            </div>
+            <div class="card-body">
+                <div id="battery-storage-graph" class="small-graph"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Second Row of Graphs -->
+<div class="row">
+    <!-- Sun Intensity vs Power Graph -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-sun me-2"></i>Sun Intensity vs Solar Power Generation
+            </div>
+            <div class="card-body">
+                <div id="sun-intensity-power-graph" class="graph-container"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Energy Balance Pie Chart -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-pie me-2"></i>Energy Balance
+            </div>
+            <div class="card-body">
+                <div id="energy-balance-chart" class="small-graph"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Daily Statistics -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-calendar-alt me-2"></i>Daily Energy Statistics (Last 7 Days)
+            </div>
+            <div class="card-body">
+                <div id="daily-statistics-graph" class="graph-container" style="height: 520px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Solar vs Wind Comparison -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-balance-scale me-2"></i>Solar vs Wind Energy - Comprehensive Performance Analysis
+                <small class="text-muted ms-2">Real-time comparison of renewable energy sources</small>
+            </div>
+            <div class="card-body">
+                <div id="solar-vs-wind-graph" class="graph-container" style="height: 520px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Function to load a graph from API
+function loadGraph(endpoint, containerId) {
+    fetch(endpoint)
+        .then(response => response.json())
+        .then(data => {
+            const graphData = JSON.parse(data.graph);
+            Plotly.newPlot(containerId, graphData.data, graphData.layout, {responsive: true});
+        })
+        .catch(error => {
+            console.error('Error loading graph:', error);
+            document.getElementById(containerId).innerHTML = '<div class="alert alert-warning">Error loading graph data</div>';
+        });
+}
+
+// Function to update statistics
+function updateStats() {
+    fetch('/api/dashboard/current_stats')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('solar-stat').textContent = data.current_solar + 'W';
+            document.getElementById('wind-stat').textContent = data.current_wind + 'W';
+            document.getElementById('consumption-stat').textContent = data.current_consumption + 'W';
+            document.getElementById('battery-stat').textContent = data.battery_percentage + '%';
+            document.getElementById('battery-level-stat').textContent = data.battery_level + 'Wh';
+            document.getElementById('efficiency-stat').textContent = data.efficiency + '%';
+            document.getElementById('sun-intensity-stat').textContent = data.sun_intensity + 'W/m²';
+        })
+        .catch(error => console.error('Error updating stats:', error));
+}
+
+// Function to refresh all data
+function refreshAllData() {
+    updateStats();
+    loadAllGraphs();
+}
+
+// Function to load all graphs
+function loadAllGraphs() {
+    loadGraph('/api/dashboard/power_generation', 'power-generation-graph');
+    loadGraph('/api/dashboard/battery_storage', 'battery-storage-graph');
+    loadGraph('/api/dashboard/sun_intensity_power', 'sun-intensity-power-graph');
+    loadGraph('/api/dashboard/energy_balance', 'energy-balance-chart');
+    loadGraph('/api/dashboard/daily_statistics', 'daily-statistics-graph');
+    loadGraph('/api/dashboard/solar_vs_wind', 'solar-vs-wind-graph');
+}
+
+// Load graphs on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllGraphs();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(refreshAllData, 30000);
+});
+
+// Make graphs responsive
+window.addEventListener('resize', function() {
+    setTimeout(function() {
+        Plotly.Plots.resize('power-generation-graph');
+        Plotly.Plots.resize('battery-storage-graph');
+        Plotly.Plots.resize('sun-intensity-power-graph');
+        Plotly.Plots.resize('energy-balance-chart');
+        Plotly.Plots.resize('daily-statistics-graph');
+        Plotly.Plots.resize('solar-vs-wind-graph');
+    }, 100);
+});
+</script>
+{% endblock %}

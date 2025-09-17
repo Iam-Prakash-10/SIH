@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts - Renewable Energy Monitor{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-exclamation-triangle me-2"></i>System Alerts</h1>
+    <button class="btn btn-outline-primary" onclick="checkFaults()">
+        <i class="fas fa-sync-alt"></i> Run Fault Check
+    </button>
+</div>
+
+<!-- Alert Summary -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-danger">{{ fault_summary.total_faults }}</h3>
+                <small>Total Faults (7 days)</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-warning">{{ alerts|length }}</h3>
+                <small>Active Alerts</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-info">{{ fault_summary.by_severity.get('high', 0) }}</h3>
+                <small>High Priority</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Alerts -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-list me-2"></i>Active Alerts
+            </div>
+            <div class="card-body">
+                {% if alerts %}
+                    {% for alert in alerts %}
+                    <div class="alert alert-{{ 'danger' if alert[2] == 'high' else 'warning' if alert[2] == 'medium' else 'info' }} alert-dismissible">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>{{ alert[2].title() }} Priority:</strong> {{ alert[3] }}
+                                <br><small class="text-muted">{{ alert[1] }} - Type: {{ alert[4] }}</small>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary">{{ alert[2] }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        No active alerts. All systems operating normally.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fault Summary by Type -->
+{% if fault_summary.by_type %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-bar me-2"></i>Fault Summary by Type (Last 7 Days)
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for fault_type, count in fault_summary.by_type.items() %}
+                    <div class="col-md-3 mb-2">
+                        <div class="text-center">
+                            <h5>{{ count }}</h5>
+                            <small>{{ fault_type.replace('_', ' ').title() }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function checkFaults() {
+    const button = document.querySelector('button[onclick="checkFaults()"]');
+    const originalText = button.innerHTML;
+    
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
+    button.disabled = true;
+    
+    fetch('/api/fault_check')
+        .then(response => response.json())
+        .then(data => {
+            if (data.faults && data.faults.length > 0) {
+                alert(`Found ${data.faults.length} new faults. Please refresh the page to see updates.`);
+            } else {
+                alert('Fault check completed. No new issues found.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error running fault check.');
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+}
+</script>
+{% endblock %}

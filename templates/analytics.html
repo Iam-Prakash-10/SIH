@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Renewable Energy Monitor{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-chart-line me-2"></i>Energy Analytics</h1>
+</div>
+
+<!-- Average Statistics -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-calculator me-2"></i>7-Day Averages
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        <h4 class="solar-color">{{ (averages.avg_solar_generation / 1000) | round(2) }} kW</h4>
+                        <small>Avg Solar Generation</small>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <h4 class="wind-color">{{ (averages.avg_wind_generation / 1000) | round(2) }} kW</h4>
+                        <small>Avg Wind Generation</small>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <h4 class="consumption-color">{{ (averages.avg_consumption / 1000) | round(2) }} kW</h4>
+                        <small>Avg Consumption</small>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <h4 class="battery-color">{{ (averages.avg_storage / 1000) | round(2) }} kWh</h4>
+                        <small>Avg Battery Storage</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Energy Balance Information -->
+{% if energy_balance %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-balance-scale me-2"></i>Energy Balance Summary
+            </div>
+            <div class="card-body">
+                <p><strong>Total Generation:</strong> {{ energy_balance.total_generation_kwh }} kWh</p>
+                <p><strong>Total Consumption:</strong> {{ energy_balance.total_consumption_kwh }} kWh</p>
+                <p><strong>Net Balance:</strong> 
+                    <span class="{{ 'text-success' if energy_balance.net_balance_kwh > 0 else 'text-danger' }}">
+                        {{ energy_balance.net_balance_kwh }} kWh
+                    </span>
+                </p>
+                <p><strong>Energy Self-Sufficiency:</strong> {{ energy_balance.energy_self_sufficiency }}%</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-clock me-2"></i>Optimal Hours
+            </div>
+            <div class="card-body">
+                <p><strong>Surplus Hours:</strong> 
+                    {% for hour in energy_balance.surplus_hours[:5] %}{{ hour }}:00{% if not loop.last %}, {% endif %}{% endfor %}
+                </p>
+                <p><strong>Deficit Hours:</strong> 
+                    {% for hour in energy_balance.deficit_hours[:5] %}{{ hour }}:00{% if not loop.last %}, {% endif %}{% endfor %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Efficiency Trends -->
+{% if efficiency_trends %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-area me-2"></i>Solar Panel Efficiency Analysis
+            </div>
+            <div class="card-body">
+                <p><strong>Average Efficiency:</strong> {{ (efficiency_trends.avg_efficiency * 100) | round(1) }}%</p>
+                <p><strong>Sun Intensity vs Power Correlation:</strong> {{ (efficiency_trends.sun_power_correlation * 100) | round(1) }}%</p>
+                {% if efficiency_trends.low_efficiency_days %}
+                <div class="alert alert-warning">
+                    <strong>Low Efficiency Days Detected:</strong> 
+                    {{ efficiency_trends.low_efficiency_days | join(', ') }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Predictions Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-crystal-ball me-2"></i>AI Predictions (Next Hour)
+            </div>
+            <div class="card-body">
+                <div id="prediction-data">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading predictions...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Load AI predictions
+function loadPredictions() {
+    fetch('/api/analytics/prediction')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById('prediction-data').innerHTML = 
+                    `<div class="alert alert-info">${data.error}</div>`;
+            } else {
+                document.getElementById('prediction-data').innerHTML = `
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            <h5 class="solar-color">${(data.predicted_solar / 1000).toFixed(2)} kW</h5>
+                            <small>Predicted Solar</small>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <h5 class="wind-color">${(data.predicted_wind / 1000).toFixed(2)} kW</h5>
+                            <small>Predicted Wind</small>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <h5 class="consumption-color">${(data.predicted_consumption / 1000).toFixed(2)} kW</h5>
+                            <small>Predicted Consumption</small>
+                        </div>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            document.getElementById('prediction-data').innerHTML = 
+                '<div class="alert alert-warning">Error loading predictions</div>';
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadPredictions();
+});
+</script>
+{% endblock %}

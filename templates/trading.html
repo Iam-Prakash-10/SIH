@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Energy Trading - Renewable Energy Monitor{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-exchange-alt me-2"></i>Energy Trading</h1>
+</div>
+
+<!-- Current Prices and Recommendation -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-dollar-sign me-2"></i>Current Market Prices
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6 text-center">
+                        <h4 class="text-success">${{ current_prices.sell_price }}/kWh</h4>
+                        <small>Sell Price</small>
+                    </div>
+                    <div class="col-6 text-center">
+                        <h4 class="text-danger">${{ current_prices.buy_price }}/kWh</h4>
+                        <small>Buy Price</small>
+                    </div>
+                </div>
+                <hr>
+                <p class="text-center mb-0">
+                    <span class="badge bg-{{ 'success' if current_prices.category == 'Off-Peak Hours' else 'warning' if current_prices.category == 'Peak Hours' else 'secondary' }}">
+                        {{ current_prices.category }}
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-lightbulb me-2"></i>Trading Recommendation
+            </div>
+            <div class="card-body">
+                <div class="text-center">
+                    <h4 class="text-{{ 'success' if recommendation.action == 'sell' else 'danger' if recommendation.action == 'buy' else 'secondary' }}">
+                        {{ recommendation.action.upper().replace('_', ' ') }}
+                    </h4>
+                    <p>{{ recommendation.reason }}</p>
+                    {% if recommendation.potential_value > 0 %}
+                    <p><strong>Potential {{ 'Earnings' if 'sell' in recommendation.action else 'Cost' }}:</strong> 
+                        ${{ recommendation.potential_value }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Trading History Summary -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-line me-2"></i>Trading Summary (Last 30 Days)
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-2 text-center">
+                        <h5 class="text-success">{{ trading_history.summary.total_bought_kwh }} kWh</h5>
+                        <small>Total Bought</small>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <h5 class="text-info">{{ trading_history.summary.total_sold_kwh }} kWh</h5>
+                        <small>Total Sold</small>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <h5 class="text-danger">${{ trading_history.summary.total_spent }}</h5>
+                        <small>Total Spent</small>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <h5 class="text-success">${{ trading_history.summary.total_earned }}</h5>
+                        <small>Total Earned</small>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <h5 class="text-{{ 'success' if trading_history.summary.net_profit >= 0 else 'danger' }}">
+                            ${{ trading_history.summary.net_profit }}
+                        </h5>
+                        <small>Net Profit</small>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <button class="btn btn-primary btn-sm" onclick="showExecuteTradeModal()">
+                            Execute Trade
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Market Analytics -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-analytics me-2"></i>Market Analytics & Recommendations
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Price Analysis</h6>
+                        <ul>
+                            <li>Peak Buy Price: ${{ market_analytics.price_analysis.avg_peak_buy_price }}/kWh</li>
+                            <li>Off-Peak Buy Price: ${{ market_analytics.price_analysis.avg_offpeak_buy_price }}/kWh</li>
+                            <li>Peak Sell Price: ${{ market_analytics.price_analysis.avg_peak_sell_price }}/kWh</li>
+                            <li>Off-Peak Sell Price: ${{ market_analytics.price_analysis.avg_offpeak_sell_price }}/kWh</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Recommendations</h6>
+                        <ul>
+                            {% for rec in market_analytics.recommendations %}
+                            <li>{{ rec }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-history me-2"></i>Recent Transactions
+            </div>
+            <div class="card-body">
+                {% if trading_history.transactions %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Amount (kWh)</th>
+                                <th>Price per kWh</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in trading_history.transactions[:10] %}
+                            <tr>
+                                <td>{{ transaction.timestamp }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if transaction.transaction_type == 'sell' else 'danger' }}">
+                                        {{ transaction.transaction_type.title() }}
+                                    </span>
+                                </td>
+                                <td>{{ transaction.energy_amount }}</td>
+                                <td>${{ transaction.price_per_kwh }}</td>
+                                <td>${{ transaction.total_amount }}</td>
+                                <td>
+                                    <span class="badge bg-success">{{ transaction.status.title() }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted">
+                    <p>No trading history available.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Execute Trade Modal -->
+<div class="modal fade" id="executeTradeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Execute Energy Trade</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="tradeForm">
+                    <div class="mb-3">
+                        <label class="form-label">Trade Type</label>
+                        <select class="form-select" name="trade_type" required>
+                            <option value="buy">Buy Energy</option>
+                            <option value="sell">Sell Energy</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (kWh)</label>
+                        <input type="number" class="form-control" name="amount_kwh" step="0.1" min="0.1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Price per kWh ($)</label>
+                        <input type="number" class="form-control" name="price_per_kwh" step="0.001" min="0.001" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="executeTrade()">Execute Trade</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showExecuteTradeModal() {
+    // Pre-fill with current prices
+    const tradeType = '{{ recommendation.action }}';
+    const price = tradeType.includes('sell') ? {{ current_prices.sell_price }} : {{ current_prices.buy_price }};
+    
+    document.querySelector('select[name="trade_type"]').value = tradeType.includes('sell') ? 'sell' : 'buy';
+    document.querySelector('input[name="price_per_kwh"]').value = price;
+    
+    const modal = new bootstrap.Modal(document.getElementById('executeTradeModal'));
+    modal.show();
+}
+
+function executeTrade() {
+    const form = document.getElementById('tradeForm');
+    const formData = new FormData(form);
+    
+    const tradeData = {
+        trade_type: formData.get('trade_type'),
+        amount_kwh: formData.get('amount_kwh'),
+        price_per_kwh: formData.get('price_per_kwh')
+    };
+    
+    fetch('/api/trading/execute', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tradeData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Trade executed successfully: ' + data.message);
+            location.reload(); // Refresh to show updated data
+        } else {
+            alert('Trade failed: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error executing trade');
+    });
+    
+    // Close modal
+    bootstrap.Modal.getInstance(document.getElementById('executeTradeModal')).hide();
+}
+</script>
+{% endblock %}
